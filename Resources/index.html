@@ -89,7 +89,21 @@ input[type=color]{width:28px;height:24px;padding:1px;cursor:pointer;background:n
 #addroot{position:absolute;left:50%;top:55%;transform:translate(-50%,-50%);z-index:2;display:none}
 .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#1c2148;border:1px solid var(--line);padding:10px 18px;border-radius:999px;font-size:13px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:9;max-width:90vw}
 .toast.show{opacity:1}
-@media(max-width:1100px){main{grid-template-columns:1fr}nav{display:none}.big{font-size:40px}}
+/* ---- chuông thông báo từ agent (Hermes) ---- */
+#bell{position:relative;border:0;background:transparent;color:var(--tx);font-size:20px;padding:4px 8px;cursor:pointer;line-height:1}
+#bell:focus-visible{outline:2px solid #8fa0ff;outline-offset:2px}
+#bellbadge{position:absolute;top:-4px;right:-2px;background:#e5484d;color:#fff;font-size:10px;font-weight:700;border-radius:999px;padding:1px 5px;min-width:14px;text-align:center}
+.nmodal{position:fixed;inset:0;background:rgba(4,6,18,.72);z-index:50;display:flex;align-items:center;justify-content:center;padding:20px}
+.nmodal[hidden]{display:none}
+.ncard{background:var(--panel);border:1px solid var(--line);border-radius:12px;width:min(560px,94vw);max-height:80vh;display:flex;flex-direction:column}
+.nhead{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--line)}
+.nhead button{border:0;background:transparent;color:var(--mu);font-size:16px;padding:4px 8px;cursor:pointer}
+#nlist{overflow:auto;padding:8px 18px 18px}
+.nitem{padding:10px 0;border-bottom:1px solid var(--line);font-size:14px}
+.nitem:last-child{border-bottom:0}
+.nitem.unread{border-left:3px solid #27d3ff;padding-left:10px}
+.ntop{display:flex;justify-content:space-between;gap:10px;margin-bottom:2px}
+@media(max-width:1100px){main{grid-template-columns:1fr}nav{display:none}.big{font-size:40px}#bell{margin-left:auto}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
@@ -97,6 +111,7 @@ input[type=color]{width:28px;height:24px;padding:1px;cursor:pointer;background:n
 <header>
   <div class="logo"><i></i>ORION · SKILL TREE</div>
   <nav><a>Thống kê</a><a class="on">Tổng quan</a><a>Bảng điều khiển</a><a>Phân tích</a></nav>
+  <button id="bell" title="Thông báo từ agent" aria-label="Thông báo từ agent">🔔<span id="bellbadge" hidden>0</span></button>
 </header>
 <main>
   <section>
@@ -144,6 +159,13 @@ input[type=color]{width:28px;height:24px;padding:1px;cursor:pointer;background:n
   </aside>
 </main>
 <div class="toast" id="toast"></div>
+
+<div class="nmodal" id="nmodal" hidden>
+  <div class="ncard" role="dialog" aria-label="Thông báo từ agent">
+    <div class="nhead"><strong>🔔 Thông báo từ agent</strong><button id="nclose" aria-label="Đóng">✕</button></div>
+    <div id="nlist"></div>
+  </div>
+</div>
 
 <script>
 const $=i=>document.getElementById(i);
@@ -446,7 +468,49 @@ $('impf').onchange=e=>{const f=e.target.files[0];if(!f)return;
       post('/api/import',j).then(()=>{view=null;sel=null;refresh()}).catch(()=>{})};
   rd.readAsText(f);e.target.value=''};
 
-refresh();
+// ---- chuông thông báo từ agent (Hermes): poll /api/agent/poll, badge + modal ----
+const NBELL=$('bell'),NBADGE=$('bellbadge'),NMODAL=$('nmodal'),NLIST=$('nlist');
+let nUnread=0,nItems=[];
+function nRender(){
+  NBADGE.hidden=nUnread<=0;
+  NBADGE.textContent=nUnread>99?'99+':nUnread;
+  NBELL.title=nUnread>0?`Thông báo từ agent (${nUnread} mới)`:'Thông báo từ agent';
+  NLIST.innerHTML=nItems.length?nItems.map(n=>{
+    const t=new Date(n.ts*1000);
+    const hh=String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0');
+    const dd=String(t.getDate()).padStart(2,'0')+'/'+String(t.getMonth()+1).padStart(2,'0');
+    return `<div class="nitem ${n._unread?'unread':''}">
+      <div class="ntop"><strong>${esc(n.title)}</strong><span class="mu">${dd} ${hh}</span></div>
+      <div style="color:#c9cdee;white-space:pre-wrap">${esc(n.body||'')}</div></div>`;
+  }).join(''):'<div class="mu" style="padding:16px 0">Chưa có thông báo nào từ agent.</div>';
+}
+function nMarkRead(){
+  nUnread=0;nItems.forEach(n=>n._unread=false);nRender();
+}
+NBELL.onclick=()=>{NMODAL.hidden=!NMODAL.hidden;if(!NMODAL.hidden)nMarkRead()};
+$('nclose').onclick=()=>{NMODAL.hidden=true};
+NMODAL.onclick=e=>{if(e.target===NMODAL)NMODAL.hidden=true};
+async function pollNotifs(){
+  try{
+    let since=0;
+    try{since=parseInt(localStorage.getItem('agent_notif_since')||'0',10)||0}catch(e){}
+    const r=await fetch('/api/agent/poll',{method:'POST',headers:{'Content-Type':'application/json','X-Panel-Client':'1'},body:JSON.stringify({since})});
+    if(!r.ok)return;
+    const j=await r.json();
+    try{localStorage.setItem('agent_notif_since',String(j.last_seq||since))}catch(e){}
+    if(Array.isArray(j.notifs)&&j.notifs.length){
+      const fresh=j.notifs.map(n=>({...n,_unread:true}));
+      nItems=[...fresh,...nItems].slice(0,30);
+      nUnread+=fresh.length;
+      nRender();
+      // tiêu đề tab sáng số thông báo mới vài giây
+      document.title=`(${nUnread}) Skill Tree – risktherain`;
+      setTimeout(()=>{document.title='Skill Tree – risktherain'},8000);
+    }
+  }catch(e){/* im lặng: server offline là chuyện thường */}
+}
+setInterval(pollNotifs,20000);
+pollNotifs();
 </script>
 </body>
 </html>
