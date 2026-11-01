@@ -1,0 +1,171 @@
+name: Build iOS IPA
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      project_path:
+        description: Path to the .xcworkspace or .xcodeproj (optional if there is only one)
+        required: false
+        type: string
+      scheme:
+        description: Shared Xcode scheme (optional if there is only one)
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Select Xcode project and scheme
+        id: xcode
+        env:
+          PROJECT_PATH_INPUT: ${{ inputs.project_path }}
+          SCHEME_INPUT: ${{ inputs.scheme }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          project_path="$PROJECT_PATH_INPUT"
+          if [[ -z "$project_path" ]]; then
+            workspaces=()
+            while IFS= read -r workspace; do
+              workspaces+=("$workspace")
+            done < <(
+              find . -type d -name '*.xcworkspace' \
+                -not -path './_build/*' -not -path '*/Pods/*'
+            )
+            projects=()
+            while IFS= read -r project; do
+              projects+=("$project")
+            done < <(
+              find . -type d -name '*.xcodeproj' \
+                -not -path './_build/*' -not -path '*/Pods/*'
+            )
+
+            if [[ ${#workspaces[@]} -eq 1 ]]; then
+              project_path="${workspaces[0]}"
+            elif [[ ${#workspaces[@]} -gt 1 ]]; then
+              echo "Multiple Xcode workspaces found. Set project_path in workflow_dispatch." >&2
+              exit 1
+            elif [[ ${#projects[@]} -eq 1 ]]; then
+              project_path="${projects[0]}"
+            elif [[ ${#projects[@]} -gt 1 ]]; then
+              echo "Multiple Xcode projects found. Set project_path in workflow_dispatch." >&2
+              exit 1
+            else
+              echo "No .xcworkspace or .xcodeproj found. Add the iOS app source before building." >&2
+              exit 1
+            fi
+          fi
+
+          if [[ ! -d "$project_path" ]]; then
+            echo "Xcode project path does not exist: $project_path" >&2
+            exit 1
+          fi
+
+          case "$project_path" in
+            *.xcworkspace)
+              container_flag="-workspace"
+              container_kind="workspace"
+              ;;
+            *.xcodeproj)
+              container_flag="-project"
+              container_kind="project"
+              ;;
+            *)
+              echo "project_path must point to a .xcworkspace or .xcodeproj directory." >&2
+              exit 1
+              ;;
+          esac
+
+          schemes_json="$(xcodebuild -list -json "$container_flag" "$project_path")"
+          if [[ -n "$SCHEME_INPUT" ]]; then
+            scheme="$SCHEME_INPUT"
+          else
+            schemes=()
+            while IFS= read -r listed_scheme; do
+              schemes+=("$listed_scheme")
+            done < <(
+              printf '%s' "$schemes_json" | python3 -c '
+          import json, sys
+          data = json.load(sys.stdin)
+          key = "workspace" if sys.argv[1] == "workspace" else "project"
+          for scheme in data.get(key, {}).get("schemes", []):
+              print(scheme)
+          ' "$container_kind"
+            )
+            if [[ ${#schemes[@]} -ne 1 ]]; then
+              echo "Expected exactly one shared Xcode scheme; found ${#schemes[@]}. Set scheme in workflow_dispatch." >&2
+              exit 1
+            fi
+            scheme="${schemes[0]}"
+          fi
+
+          echo "container_flag=$container_flag" >> "$GITHUB_OUTPUT"
+          echo "project_path=$project_path" >> "$GITHUB_OUTPUT"
+          echo "scheme=$scheme" >> "$GITHUB_OUTPUT"
+
+      - name: Archive unsigned iOS app
+        env:
+          CONTAINER_FLAG: ${{ steps.xcode.outputs.container_flag }}
+          PROJECT_PATH: ${{ steps.xcode.outputs.project_path }}
+          SCHEME: ${{ steps.xcode.outputs.scheme }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          xcodebuild archive \
+            "$CONTAINER_FLAG" "$PROJECT_PATH" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            IPHONEOS_DEPLOYMENT_TARGET=16.0 \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=''
+
+      - name: Package unsigned IPA
+        id: ipa
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          applications_dir="$RUNNER_TEMP/App.xcarchive/Products/Applications"
+          apps=()
+          while IFS= read -r app; do
+            apps+=("$app")
+          done < <(find "$applications_dir" -maxdepth 1 -type d -name '*.app')
+          if [[ ${#apps[@]} -ne 1 ]]; then
+            echo "Expected one archived .app, found ${#apps[@]}." >&2
+            exit 1
+          fi
+
+          app_path="${apps[0]}"
+          app_name="$(basename "$app_path" .app)"
+          staging_dir="$RUNNER_TEMP/ipa"
+          mkdir -p "$staging_dir/Payload"
+          ditto "$app_path" "$staging_dir/Payload/$app_name.app"
+          ipa_path="$GITHUB_WORKSPACE/$app_name.ipa"
+          (cd "$staging_dir" && /usr/bin/zip -qry "$ipa_path" Payload)
+
+          echo "ipa_path=$ipa_path" >> "$GITHUB_OUTPUT"
+          echo "ipa_name=$app_name.ipa" >> "$GITHUB_OUTPUT"
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-ios-ipa
+          path: ${{ steps.ipa.outputs.ipa_path }}
+          if-no-files-found: error
+          retention-days: 14
