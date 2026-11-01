@@ -7,11 +7,14 @@
 /* Begin PBXBuildFile section */
 		A10000000000000000000001 /* LifeRpgApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000002 /* LifeRpgApp.swift */; };
 		A10000000000000000000010 /* PanelWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000011 /* PanelWebView.swift */; };
+		A10000000000000000000012 /* SkillTreeLocalServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000013 /* SkillTreeLocalServer.swift */; };
+		A10000000000000000000014 /* index.html in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000015 /* index.html */; };
 /* End PBXBuildFile section */
-
 /* Begin PBXFileReference section */
 		A10000000000000000000002 /* LifeRpgApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LifeRpgApp.swift; sourceTree = "<group>"; };
 		A10000000000000000000011 /* PanelWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelWebView.swift; sourceTree = "<group>"; };
+		A10000000000000000000013 /* SkillTreeLocalServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkillTreeLocalServer.swift; sourceTree = "<group>"; };
+		A10000000000000000000015 /* index.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; path = index.html; sourceTree = "<group>"; };
 		A10000000000000000000003 /* LifeRpgApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LifeRpgApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -20,6 +23,7 @@
 			isa = PBXGroup;
 			children = (
 				A10000000000000000000005 /* Sources */,
+				A10000000000000000000016 /* Resources */,
 				A10000000000000000000006 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -29,8 +33,17 @@
 			children = (
 				A10000000000000000000002 /* LifeRpgApp.swift */,
 				A10000000000000000000011 /* PanelWebView.swift */,
+				A10000000000000000000013 /* SkillTreeLocalServer.swift */,
 			);
 			path = Sources;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000016 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000015 /* index.html */,
+			);
+			path = Resources;
 			sourceTree = "<group>";
 		};
 		A10000000000000000000006 /* Products */ = {
@@ -49,6 +62,7 @@
 			buildConfigurationList = A1000000000000000000000B /* Build configuration list for PBXNativeTarget "LifeRpgApp" */;
 			buildPhases = (
 				A10000000000000000000008 /* Sources */,
+				A10000000000000000000017 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -98,10 +112,22 @@
 			files = (
 				A10000000000000000000001 /* LifeRpgApp.swift in Sources */,
 				A10000000000000000000010 /* PanelWebView.swift in Sources */,
+				A10000000000000000000012 /* SkillTreeLocalServer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A10000000000000000000017 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000014 /* index.html in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
 		A1000000000000000000000C /* Debug */ = {

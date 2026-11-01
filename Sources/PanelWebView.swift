@@ -1,17 +1,29 @@
 import SwiftUI
 import WebKit
 
-// Panel gốc: skilltree.risktherain.com — trang skill tree riêng của mq.
+// Panel skill tree chạy OFFLINE trong app:
+// - UI: Resources/index.html (từ repo EpicTalesCoder/skilltree) bundle sẵn trong IPA.
+// - API: SkillTreeLocalServer (Swift) thay thế server.py — cùng endpoints, dữ liệu lưu SQLite trong app.
+// - Remote URL chỉ dùng khi bật "Dùng bản web" trong menu app (sync với skilltree.risktherain.com).
+
 let PANEL_URL = URL(string: "https://skilltree.risktherain.com")!
 
 // MARK: - ViewModel
 
 @MainActor
 final class PanelViewModel: ObservableObject {
+    enum Source: String, CaseIterable, Identifiable {
+        case offline = "Trong app"
+        case remote = "Bản web"
+        var id: String { rawValue }
+    }
+
     @Published var isLoading = true
     @Published var progress: Double = 0
     @Published var isOffline = false
     @Published var toast: String?
+    @Published var source: Source = .offline
+    @Published var showSourcePicker = false
 
     private(set) var lastError: String?
 
@@ -66,8 +78,9 @@ struct PanelWebView: UIViewRepresentable {
 
         context.coordinator.webView = webView
         context.coordinator.observeReload()
+        context.coordinator.observeSourceChange()
 
-        webView.load(URLRequest(url: PANEL_URL))
+        webView.load(context.coordinator.request(for: model.source))
         return webView
     }
 
@@ -79,9 +92,31 @@ struct PanelWebView: UIViewRepresentable {
         let model: PanelViewModel
         var webView: WKWebView?
         private var reloadObserver: NSObjectProtocol?
+        private var sourceObserver: NSObjectProtocol?
+        private var localServer: SkillTreeLocalServer?
 
         init(model: PanelViewModel) {
             self.model = model
+        }
+
+        func request(for source: PanelViewModel.Source) -> URLRequest {
+            switch source {
+            case .offline:
+                let server = localServer ?? {
+                    let s = SkillTreeLocalServer()
+                    do { try s.start() } catch {
+                        model.showToast("Không khởi động được server cục bộ: \(error.localizedDescription)")
+                    }
+                    localServer = s
+                    return s
+                }()
+                return URLRequest(url: server.rootURL)
+            case .remote:
+                // Dừng server cục bộ khi chuyển sang bản web
+                localServer?.stop()
+                localServer = nil
+                return URLRequest(url: PANEL_URL)
+            }
         }
 
         func observeReload() {
@@ -93,8 +128,22 @@ struct PanelWebView: UIViewRepresentable {
             }
         }
 
+        func observeSourceChange() {
+            sourceObserver = NotificationCenter.default.addObserver(
+                forName: .panelSourceChanged, object: nil, queue: .main
+            ) { [weak self] note in
+                guard let self,
+                      let source = note.object as? PanelViewModel.Source,
+                      source != self.model.source else { return }
+                self.model.source = source
+                self.webView?.load(self.request(for: source))
+            }
+        }
+
         deinit {
             if let reloadObserver { NotificationCenter.default.removeObserver(reloadObserver) }
+            if let sourceObserver { NotificationCenter.default.removeObserver(sourceObserver) }
+            localServer?.stop()
         }
 
         // MARK: WKNavigationDelegate
@@ -126,7 +175,17 @@ struct PanelWebView: UIViewRepresentable {
             withError error: Error
         ) {
             model.isLoading = false
-            model.handleFailure(error.localizedDescription)
+            // Bản web lỗi mạng → đưa về bản trong app
+            if model.source == .remote {
+                model.showToast("Không kết nối được bản web, chuyển về bản trong app")
+                NotificationCenter.default.post(name: .panelSourceChanged, object: PanelViewModel.Source.offline)
+            } else {
+                model.handleFailure(error.localizedDescription)
+            }
         }
     }
+}
+
+extension Notification.Name {
+    static let panelSourceChanged = Notification.Name("panelSourceChanged")
 }

@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Skill Tree – risktherain</title>
+<style>
+:root{color-scheme:dark;--bg:#070815;--panel:#10132a;--line:#262a52;--tx:#f2f4ff;--mu:#8a90b8;--ac:#2f3cff;--ok:#3ddc84;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:"Inter","Segoe UI",system-ui,sans-serif;min-height:100vh}
+header{display:flex;align-items:center;gap:24px;padding:14px 28px;background:#0d1024;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.logo{font-weight:600;letter-spacing:.04em;display:flex;align-items:center;gap:8px}
+.logo i{width:22px;height:22px;border-radius:50%;border:5px solid #5a6bff;border-right-color:#27d3ff;display:inline-block}
+nav{display:flex;gap:28px;margin-left:auto;color:var(--mu);font-size:14px}
+nav a{padding:6px 0}nav .on{color:var(--tx);border-bottom:2px solid var(--ac)}
+main{display:grid;grid-template-columns:280px 1fr 320px;gap:24px;padding:28px;max-width:1500px;margin:0 auto}
+h1{font-size:34px;margin:0 0 28px;font-weight:700}
+h3{margin:0 0 6px;font-size:18px}
+.mu{color:var(--mu);font-size:13px}
+.big{font-size:52px;font-weight:700;margin:6px 0 28px;line-height:1}
+.btns{display:flex;gap:10px;margin:14px 0 34px;flex-wrap:wrap}
+button{font:inherit;cursor:pointer;border-radius:999px;padding:10px 22px;border:1.5px solid var(--ac);background:transparent;color:#fff;font-size:13px}
+button.p{background:var(--ac)}button:disabled{opacity:.35;cursor:not-allowed}
+button:focus-visible{outline:2px solid #8fa0ff;outline-offset:2px}
+.row{display:grid;grid-template-columns:12px 1fr 36px 52px;gap:8px;align-items:center;font-size:12px;padding:7px 0;color:var(--tx)}
+.row b{font-weight:400;color:var(--mu);text-align:right}.row span:last-child{text-align:right}
+.dot{width:6px;height:6px;border-radius:50%}
+.card{background:var(--panel);border-radius:10px;padding:18px}
+.mid{position:relative;min-height:560px}
+.ghost{position:absolute;inset:60px 0 auto;text-align:center;font-size:56px;font-weight:700;color:#12152e;pointer-events:none;z-index:0}
+svg#tree{width:100%;height:auto;position:relative;z-index:1;display:block;touch-action:pan-y;user-select:none;-webkit-user-select:none}
+svg#tree.editing{touch-action:none;cursor:crosshair}
+svg#tree.editing .node{cursor:grab}
+/* ---- node chuyển động: trôi nổi bằng JS (rAF) để cạnh nối bám theo từng frame ---- */
+.node{cursor:pointer;transform-box:fill-box}
+.node .inner{transform-box:fill-box;transform-origin:center;transition:transform .18s ease}
+.node.dragging{cursor:grabbing}
+.node.dragging .inner{transform:scale(1.12)}
+.node.dragging circle.ring{stroke:#27d3ff!important;stroke-width:5!important;filter:drop-shadow(0 0 12px #27d3ff)}
+.node.dragging circle,.node.dragging text{transition:none!important}
+@keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.32)}100%{transform:scale(1)}}
+.inner.pop{animation:pop .45s cubic-bezier(.34,1.56,.64,1)}
+@media(hover:hover){.node:hover circle.ring{stroke-width:4}}
+.edge{stroke:#2a2e58;stroke-width:1.5;transition:stroke .3s,opacity .5s}
+.edge.lit{stroke:#fff;stroke-width:3;filter:drop-shadow(0 0 5px #4f5cff);animation:litpulse 2.4s ease-in-out infinite}
+.edge.hot{stroke:#27d3ff!important;stroke-width:2.5!important}
+@keyframes litpulse{0%,100%{opacity:1;stroke-width:3}50%{opacity:.72;stroke-width:2.4}}
+.node circle.ring{fill:#070815;stroke:#2d3160;stroke-width:2;transition:stroke .25s,stroke-width .25s,filter .25s}
+.node.open circle.ring{stroke:#fff;stroke-width:5;filter:drop-shadow(0 0 9px #3b4bff) drop-shadow(0 0 18px #2f3cff)}
+.node.avail circle.ring{stroke:#5560c8;stroke-dasharray:4 4}
+.node.sel circle.sel{stroke:#27d3ff;opacity:1}.node circle.sel{fill:none;stroke-width:2;opacity:0;transition:opacity .2s}
+.node text.ic{fill:#fff;font-size:20px;text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.node:not(.open) text.ic{fill:#6d73a8}
+.node text.lb{fill:var(--mu);font-size:12px;text-anchor:middle;pointer-events:none}
+.node.open text.lb{fill:#fff}
+.node:focus-visible circle.sel{opacity:1}
+/* ---- drill-down vào cây skill con ---- */
+svg#tree.focused .node.dim,svg#tree.focused .edge.dim{opacity:.1;pointer-events:none}
+.node.dim{transition:opacity .5s}
+svg#tree.focused .node.viewroot{cursor:zoom-out}
+.node.viewroot circle.sel{opacity:1;stroke:#27d3ff;stroke-dasharray:6 6}
+#crumb{position:absolute;top:2px;left:2px;z-index:3;display:none;padding:6px 14px;border-radius:999px;border:1px solid var(--line);background:rgba(16,19,42,.85);color:var(--tx);font-size:12px}
+#crumb:hover{border-color:#4f5cff}
+.bot{display:flex;justify-content:space-around;gap:12px;flex-wrap:wrap;margin-top:6px}
+.mini{display:flex;align-items:center;gap:12px}
+.mini .ico{width:38px;height:38px;border:1px solid var(--line);border-radius:10px;display:grid;place-items:center;color:var(--mu)}
+.mini small{display:block;color:var(--mu);font-size:13px}.mini strong{font-size:22px}
+.bars{display:flex;gap:3px;align-items:flex-end;height:30px}.bars i{width:4px;background:linear-gradient(#5ee0ff,#3b6bff);border-radius:2px;transition:height .3s}
+.det{margin-top:22px}
+.det h2{margin:0 0 4px;font-size:20px}
+.lv{display:flex;gap:5px;margin:12px 0}.lv i{flex:1;height:6px;border-radius:3px;background:#222650;transition:background .3s}.lv i.f{background:linear-gradient(90deg,#27d3ff,#5a6bff)}
+.det .btns{margin:14px 0 0}
+.donut{display:block;margin:0 auto 10px}
+.tot{font-size:30px;font-weight:700;text-align:center}
+.up{color:var(--ok);font-size:12px}
+input,select,textarea{font:inherit;background:#0b0e22;border:1px solid var(--line);border-radius:8px;color:var(--tx);padding:7px 10px;width:100%}
+input:focus,select:focus,textarea:focus{outline:1px solid #4f5cff}
+textarea{resize:vertical}
+label.f{display:block;margin:10px 0 3px;color:var(--mu);font-size:12px}
+.frow{display:flex;gap:8px}.frow>div{flex:1}
+.crow{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12px}
+.crow span{flex:1}
+input[type=color]{width:28px;height:24px;padding:1px;cursor:pointer;background:none;border:1px solid var(--line);border-radius:6px}
+.iconbtn{border:0;padding:2px 9px;border-radius:6px;font-size:12px}
+.addcat{display:flex;gap:6px;margin-top:10px}
+.addcat input[type=text]{flex:1;min-width:0}
+.addcat button{padding:6px 12px}
+#addroot{position:absolute;left:50%;top:55%;transform:translate(-50%,-50%);z-index:2;display:none}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#1c2148;border:1px solid var(--line);padding:10px 18px;border-radius:999px;font-size:13px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:9;max-width:90vw}
+.toast.show{opacity:1}
+@media(max-width:1100px){main{grid-template-columns:1fr}nav{display:none}.big{font-size:40px}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><i></i>ORION · SKILL TREE</div>
+  <nav><a>Thống kê</a><a class="on">Tổng quan</a><a>Bảng điều khiển</a><a>Phân tích</a></nav>
+</header>
+<main>
+  <section>
+    <h1>Quản lý kỹ năng</h1>
+    <h3>Điểm kỹ năng còn lại</h3>
+    <div class="mu">Mở khóa nút liền kề để tiến xa hơn</div>
+    <div class="btns"><button class="p" id="reset">Đặt lại</button><button id="max">Nhận thêm điểm</button></div>
+    <div class="mu">Tổng điểm khả dụng</div>
+    <div class="big" id="pts">0</div>
+    <h3>Số lượng theo nhóm</h3>
+    <div id="cats"></div>
+    <div class="card" style="margin-top:26px;display:flex;align-items:center;gap:16px">
+      <svg width="64" height="40" viewBox="0 0 64 40"><path d="M2 36 C14 4 22 4 30 22 S46 6 62 36" fill="none" stroke="#ff9a3c" stroke-width="2"/><path d="M2 36 C14 14 24 14 32 26 S48 14 62 36" fill="none" stroke="#a63cff" stroke-width="2"/></svg>
+      <div><div class="mu">Cấp độ đã đạt</div><strong style="font-size:20px" id="lvTotal">0</strong> <span class="up" id="pct">▲ 0%</span></div>
+    </div>
+    <div class="card" style="margin-top:18px;display:flex;gap:10px;justify-content:space-between;align-items:center;flex-wrap:wrap">
+      <div class="mu">Sao lưu dữ liệu</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button id="exp" style="padding:6px 14px">Xuất JSON</button>
+        <button id="imp" style="padding:6px 14px">Nhập JSON</button>
+        <input type="file" id="impf" accept=".json,application/json" style="display:none">
+      </div>
+    </div>
+  </section>
+
+  <section class="mid">
+    <div class="ghost" id="ghost">Skill Tree</div>
+    <button id="crumb">← <span id="crumbname"></span></button>
+    <svg id="tree" viewBox="0 0 760 620" role="group" aria-label="Cây kỹ năng"></svg>
+    <button id="addroot">＋ Tạo node gốc</button>
+    <div class="bot">
+      <div class="mini"><div class="ico">◔</div><div><small>Đã mở khóa</small><strong id="s1">0</strong></div><div class="bars" id="b1"></div></div>
+      <div class="mini"><div class="ico">◎</div><div><small>Điểm đã dùng</small><strong id="s2">0</strong></div></div>
+    </div>
+  </section>
+
+  <aside>
+    <div class="mu" id="detlabel">Kỹ năng đang chọn</div>
+    <div class="det card" style="margin-top:8px" id="det"></div>
+    <div class="card" style="margin-top:22px">
+      <svg class="donut" width="140" height="140" viewBox="0 0 140 140" id="donut"></svg>
+      <div class="mu" style="text-align:center">Tổng điểm đã đầu tư</div>
+      <div class="tot" id="dt">0</div>
+    </div>
+  </aside>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+const $=i=>document.getElementById(i);
+const NS='http://www.w3.org/2000/svg';
+const el=(t,a,p)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);p&&p.appendChild(e);return e};
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+let D=null,sel=null,mode='use',drag=null,tt,suppressClick=false,view=null;
+const by=id=>D.nodes.find(n=>n.id===id);
+const lv=id=>D.state[id]||0;
+const avail=n=>!n.parent||(by(n.parent)&&lv(n.parent)>0);
+const kids=id=>D.nodes.filter(n=>n.parent===id);
+const descSet=id=>{const o=new Set(),q=[id];while(q.length){const c=q.pop();D.nodes.forEach(n=>{if(n.parent===c&&!o.has(n.id)){o.add(n.id);q.push(n.id)}})}return o};
+const visSet=id=>new Set([id,...kids(id).map(k=>k.id)]); // 1 tầng: node + con trực tiếp
+
+let tT;function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(tT);tT=setTimeout(()=>t.classList.remove('show'),2800)}
+async function post(path,body){
+  const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json','X-Panel-Client':'1'},body:JSON.stringify(body||{})});
+  let j={};try{j=await r.json()}catch(e){}
+  if(!r.ok){toast(j.error||('Lỗi '+r.status));throw new Error(j.error||r.status)}
+  return j;
+}
+async function refresh(){
+  D=await (await fetch('/api/data')).json();
+  if(sel&&!by(sel))sel=null;
+  if(view&&!by(view))view=null;
+  if(!sel&&D.nodes.length)sel=D.nodes[0].id;
+  render();
+}
+function popNode(id){const n=by(id);if(!n||!n._inner)return;const i=n._inner;
+  i.classList.remove('pop');void i.getBoundingClientRect();i.classList.add('pop');
+  i.addEventListener('animationend',()=>i.classList.remove('pop'),{once:true})}
+
+function render(){
+  $('pts').textContent=D.pts;
+  const catNames=Object.keys(D.cats);
+  const tot=catNames.map(c=>[c,D.nodes.filter(n=>n.cat===c).reduce((s,n)=>s+lv(n.id),0),D.nodes.filter(n=>n.cat===c).length]);
+  const sum=tot.reduce((s,t)=>s+t[1],0);
+  const open=D.nodes.filter(n=>lv(n.id)>0).length;
+  const maxSum=D.nodes.reduce((s,n)=>s+n.max_lv,0);
+  $('cats').innerHTML=mode==='edit'
+    ? catNames.map(c=>`<div class="crow"><i class="dot" style="background:${D.cats[c]}"></i><span>${esc(c)}</span><input type="color" value="${D.cats[c]}" data-catcolor="${esc(c)}" title="Đổi màu"><button class="iconbtn" data-delcat="${esc(c)}" title="Xóa danh mục">✕</button></div>`).join('')
+      +`<div class="addcat"><input type="text" id="nc_name" placeholder="Danh mục mới" maxlength="24"><input type="color" id="nc_color" value="#27d3ff"><button id="nc_add" class="p">Thêm</button></div>`
+    : tot.map(([c,v,k])=>`<div class="row"><i class="dot" style="background:${D.cats[c]}"></i><span>${esc(c)}</span><b>${k}</b><span>${v}</span></div>`).join('');
+  $('lvTotal').textContent=sum;
+  $('pct').textContent='▲ '+(maxSum?Math.round(sum/maxSum*100):0)+'%';
+  $('s1').textContent=open+'/'+D.nodes.length;
+  $('s2').textContent=sum;
+  $('dt').textContent=sum;
+  $('b1').innerHTML=D.nodes.map(n=>`<i style="height:${6+lv(n.id)*5}px;opacity:${lv(n.id)?1:.35}"></i>`).join('');
+  $('ghost').style.display=D.nodes.length?'block':'none';
+  $('addroot').style.display=D.nodes.length?'none':'inline-block';
+  $('detlabel').textContent=mode==='edit'?'Chỉnh sửa cây':'Kỹ năng đang chọn';
+  renderTree();
+  renderDonut(tot,sum);
+  if(mode==='edit'&&sel&&by(sel))renderEdit();else renderUse();
+}
+
+function renderTree(){
+  const T=$('tree');T.innerHTML='';
+  T.classList.toggle('editing',mode==='edit');
+  T.classList.add('focused'); // luôn ở chế độ "1 tầng": cây chính chỉ hiện gốc, view con chỉ hiện nó + con trực tiếp
+  const VIS=view?visSet(view):new Set(D.nodes.filter(n=>!n.parent).map(n=>n.id));
+  D.nodes.forEach(n=>{
+    if(!VIS.has(n.id)){n._g=null;n._inner=null;n._edge=null;return} // node ngoài tầng hiện tại: ẨN hẳn, không vẽ
+    const p=n.parent&&by(n.parent);
+    if(p&&VIS.has(p.id))n._edge=el('line',{x1:p.x,y1:p.y,x2:n.x,y2:n.y,class:'edge'+(lv(n.id)>0&&lv(p.id)>0?' lit':'')},T); // cha ẩn thì không vẽ cạnh lơ lửng
+  });
+  D.nodes.forEach(n=>{
+    if(!VIS.has(n.id))return;
+    const isRootOfView=view===n.id;
+    const enterable=kids(n.id).length>0;
+    const g=el('g',{class:'node'+(lv(n.id)>0?' open':(avail(n)?' avail':''))+(sel===n.id?' sel':'')
+      +(isRootOfView?' viewroot':''),tabindex:0,role:'button','aria-label':n.name},T);
+    const tip=el('title',{},g);
+    tip.textContent=isRootOfView?'Bấm để quay lại cây cha':(enterable?'Bấm để xem các skill bên trong':n.name);
+    const inner=el('g',{class:'inner'},g);
+    n._g=g;n._inner=inner;seedDrift(n);
+    n._selC=el('circle',{cx:n.x,cy:n.y,r:36,class:'sel'},inner);
+    n._ring=el('circle',{cx:n.x,cy:n.y,r:30,class:'ring'},inner);
+    n._ic=el('text',{x:n.x,y:n.y,class:'ic'},inner);n._ic.textContent=n.icon;
+    n._lb=el('text',{x:n.x,y:n.y+54,class:'lb'},inner);n._lb.textContent=n.name;
+    const [ox,oy]=driftOff(n,performance.now()); // đặt đúng vị trí trôi hiện tại → re-render không nháy
+    n._ox=ox;n._oy=oy;place(n);
+    if(n._edge){const pp=by(n.parent);if(pp){n._edge.setAttribute('x1',pp.x+(pp._ox||0));n._edge.setAttribute('y1',pp.y+(pp._oy||0));n._edge.setAttribute('x2',n.x+ox);n._edge.setAttribute('y2',n.y+oy)}}
+    g.onclick=()=>{if(suppressClick)return;
+      if(isRootOfView){const p=by(n.id).parent;setView((p&&by(p).parent)?p:null);return} // click gốc view → về cây cha (cha là gốc toàn cây thì về cây chính)
+      select(n.id);
+      if(enterable)setView(n.id); // có skill con → đi vào bên trong
+    };
+    g.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();select(n.id)}};
+    attachDrag(g,n);
+  });
+}
+
+// chọn node: chỉ đổi class trên element sẵn có + vẽ lại panel chi tiết
+function select(id){sel=id;
+  D.nodes.forEach(n=>{if(n._g)n._g.classList.toggle('sel',n.id===sel)});
+  if(mode==='edit')renderEdit();else renderUse();
+}
+
+// ---- camera + điều hướng vào cây skill con ----
+const cam={anim:false,t0:0,dur:650,cx:0,cy:0,cw:760,ch:620,fx:0,fy:0,fw:760,fh:620,tx:0,ty:0,tw:760,th:620};
+function frameOf(ids){
+  let x1=1e9,y1=1e9,x2=-1e9,y2=-1e9;
+  ids.forEach(id=>{const n=by(id);if(!n)return;const o=driftOff(n,performance.now());
+    x1=Math.min(x1,n.x+o[0]-30);x2=Math.max(x2,n.x+o[0]+30);
+    y1=Math.min(y1,n.y+o[1]-44);y2=Math.max(y2,n.y+o[1]+72);});
+  const P=100;x1-=P;y1-=P;x2+=P;y2+=P;
+  let w=x2-x1,h=y2-y1;
+  if(w<430){const c=(x1+x2)/2;x1=c-215;x2=c+215;w=430}
+  if(h<360){const c=(y1+y2)/2;y1=c-180;y2=c+180;h=360}
+  const A=760/620;
+  if(w/h<A){const nw=h*A,c=(x1+x2)/2;x1=c-nw/2;w=nw}
+  else{const nh=w/A,c=(y1+y2)/2;y1=c-nh/2;h=nh}
+  return {x:x1,y:y1,w,h};
+}
+function flyTo(f){
+  cam.fx=cam.cx;cam.fy=cam.cy;cam.fw=cam.cw;cam.fh=cam.ch;
+  cam.tx=f.x;cam.ty=f.y;cam.tw=f.w;cam.th=f.h;
+  cam.t0=performance.now();cam.anim=true;
+}
+function setView(id){
+  view=id;
+  if(view){
+    flyTo(frameOf([...visSet(view)]));
+    const pn=by(view).parent;
+    $('crumbname').textContent=(pn&&by(pn).parent)?by(pn).name:'Cây chính';
+    $('crumb').style.display='inline-block';
+  }else{
+    flyTo({x:0,y:0,w:760,h:620});
+    $('crumb').style.display='none';
+  }
+  render();
+}
+
+function renderDonut(tot,sum){
+  const d=$('donut');d.innerHTML='';
+  const R=54,C=2*Math.PI*R;let off=0;
+  el('circle',{cx:70,cy:70,r:R,fill:'none',stroke:'#1b1f42','stroke-width':12},d);
+  if(sum)tot.forEach(([c,v])=>{if(!v)return;const len=C*v/sum;
+    el('circle',{cx:70,cy:70,r:R,fill:'none',stroke:D.cats[c],'stroke-width':12,'stroke-dasharray':`${Math.max(len-3,1)} ${C}`,'stroke-dashoffset':-off,transform:'rotate(-90 70 70)','stroke-linecap':'round'},d);off+=len});
+}
+
+function renderUse(){
+  if(!sel||!by(sel)){$('det').innerHTML='<div class="mu">Chưa chọn node nào.</div>';return}
+  const n=by(sel),L=lv(sel);
+  const can=D.pts>0&&avail(n)&&L<n.max_lv;
+  $('det').innerHTML=`<h2>${esc(n.name)}</h2><div class="mu">${esc(n.cat)} · ${avail(n)?'Có thể nâng cấp':'Chưa mở khóa: cần '+esc(by(n.parent).name)}</div>
+  <p style="font-size:14px;color:#c9cdee;margin:12px 0 0">${esc(n.desc)}</p>
+  <div class="lv">${Array.from({length:n.max_lv},(_,i)=>`<i class="${i<L?'f':''}"></i>`).join('')}</div>
+  <div class="mu">Cấp ${L} / ${n.max_lv}</div>
+  <div class="btns"><button class="p" id="u" ${can?'':'disabled'}>Nâng cấp</button><button id="dn" ${L>0?'':'disabled'}>Hoàn điểm</button><button id="edmode" title="Chỉnh sửa cây">✎ Sửa cây</button></div>`;
+  $('u').onclick=()=>post('/api/up',{id:sel}).then(refresh).then(()=>popNode(sel)).catch(()=>{});
+  $('dn').onclick=()=>post('/api/down',{id:sel}).then(refresh).then(()=>popNode(sel)).catch(()=>{});
+  $('edmode').onclick=()=>{mode='edit';render()};
+}
+
+function renderEdit(){
+  const n=by(sel);
+  const validParents=D.nodes.filter(x=>x.id!==sel&&!descSet(sel).has(x.id));
+  $('det').innerHTML=`<h2>${esc(n.name)}</h2><div class="mu">id: ${esc(n.id)}</div>
+  <label class="f">Tên</label><input id="f_name" value="${esc(n.name)}" maxlength="60">
+  <div class="frow"><div><label class="f">Icon</label><input id="f_icon" value="${esc(n.icon)}" maxlength="4"></div>
+  <div><label class="f">Cấp tối đa</label><input id="f_max" type="number" min="1" max="10" value="${n.max_lv}"></div></div>
+  <label class="f">Danh mục</label><select id="f_cat">${Object.keys(D.cats).map(c=>`<option value="${esc(c)}" ${c===n.cat?'selected':''}>${esc(c)}</option>`).join('')}</select>
+  <label class="f">Node cha</label><select id="f_parent"><option value="">(gốc)</option>${validParents.map(p=>`<option value="${p.id}" ${p.id===n.parent?'selected':''}>${esc(p.name)}</option>`).join('')}</select>
+  <div class="frow"><div><label class="f">X</label><input id="f_x" type="number" value="${n.x}"></div><div><label class="f">Y</label><input id="f_y" type="number" value="${n.y}"></div></div>
+  <label class="f">Mô tả</label><textarea id="f_desc" rows="3" maxlength="300">${esc(n.desc)}</textarea>
+  <div class="btns"><button class="p" id="f_save">Lưu</button><button id="f_add">＋ Node con</button><button id="f_del">Xóa node</button><button id="exmode">✕ Xong</button></div>`;
+  $('exmode').onclick=()=>{mode='use';render()};
+  $('f_save').onclick=()=>post('/api/node/update',{id:sel,name:$('f_name').value,icon:$('f_icon').value,cat:$('f_cat').value,
+    max_lv:+$('f_max').value,parent:$('f_parent').value,x:+$('f_x').value,y:+$('f_y').value,desc:$('f_desc').value}).then(refresh).catch(()=>{});
+  $('f_add').onclick=()=>post('/api/node/add',{parent:sel,name:'Node mới',icon:'◆',cat:n.cat,max_lv:3,
+    x:clamp(n.x+150,40,720),y:clamp(n.y+130,40,550),desc:''})
+    .then(j=>{const ni=j.new_id;return refresh().then(()=>{sel=ni;render();popNode(ni)})}).catch(()=>{});
+  $('f_del').onclick=()=>{if(confirm('Xóa node "'+n.name+'"? (Điểm đã đầu tư sẽ được hoàn lại)'))
+    post('/api/node/delete',{id:sel}).then(()=>{if(view===sel)view=null;sel=null;refresh()}).catch(()=>{})};
+  bindCatManager();
+}
+
+function bindCatManager(){
+  document.querySelectorAll('[data-catcolor]').forEach(inp=>inp.onchange=()=>
+    post('/api/cat/update',{name:inp.dataset.catcolor,color:inp.value}).then(refresh).catch(()=>{}));
+  document.querySelectorAll('[data-delcat]').forEach(btn=>btn.onclick=()=>{
+    if(confirm('Xóa danh mục "'+btn.dataset.delcat+'"?'))
+      post('/api/cat/delete',{name:btn.dataset.delcat}).then(refresh).catch(()=>{})});
+  const add=$('nc_add');
+  if(add)add.onclick=()=>post('/api/cat/add',{name:$('nc_name').value,color:$('nc_color').value}).then(refresh).catch(()=>{});
+}
+
+// ---- vị trí vẽ = gốc + độ lệch trôi (dùng ref đã cache, không querySelector) ----
+function place(n){
+  const ox=n._ox||0,oy=n._oy||0;
+  n._selC.setAttribute('cx',n.x+ox);n._selC.setAttribute('cy',n.y+oy);
+  n._ring.setAttribute('cx',n.x+ox);n._ring.setAttribute('cy',n.y+oy);
+  n._ic.setAttribute('x',n.x+ox);n._ic.setAttribute('y',n.y+oy);
+  n._lb.setAttribute('x',n.x+ox);n._lb.setAttribute('y',n.y+54+oy);
+}
+
+// ---- trôi nổi kiểu graph: mỗi node lang quanh vị trí gốc theo quỹ đạo sin
+//      sinh từ hash id → load lại trang/re-render trôi tiếp đúng quỹ đạo, không giật ----
+const REDUCED=matchMedia('(prefers-reduced-motion: reduce)').matches;
+function seedDrift(n){
+  if(n._d)return n._d;
+  let h=0;for(const ch of n.id)h=(h*31+ch.charCodeAt(0))|0;
+  const r=()=>{h=(h*1103515245+12345)|0;return ((h>>>16)&1023)/1023};
+  n._d={ax:4+8*r(),ay:4+8*r(),fx:.0003+.0004*r(),fy:.0003+.0004*r(),px:6.283*r(),py:6.283*r()};
+  return n._d;
+}
+function driftOff(n,t){
+  if(n._hold)return [n._hx||0,n._hy||0]; // đang cầm trên tay → đóng băng
+  if(REDUCED)return [0,0];
+  const d=seedDrift(n);
+  return [d.ax*Math.sin(t*d.fx+d.px)+d.ax*.4*Math.sin(t*d.fx*2.33+d.px*1.7),
+          d.ay*Math.sin(t*d.fy+d.py)+d.ay*.4*Math.sin(t*d.fy*2.11+d.py*2.3)];
+}
+function tick(t){
+  if(!D||!D.nodes.length||document.hidden){requestAnimationFrame(tick);return}
+  if(drag&&drag.moved){ // kéo: chỉ cập nhật tọa độ đích, mọi DOM write gộp về đây mỗi frame
+    const n=drag.n,p=drag.p;
+    n.x=clamp(Math.round(p.x-drag.dx),40,720);n.y=clamp(Math.round(p.y-drag.dy),40,550);
+  }
+  D.nodes.forEach(n=>{const o=driftOff(n,t);n._ox=o[0];n._oy=o[1];if(n._g)place(n)}); // node đang cầm driftOff trả độ lệch đóng băng
+  D.nodes.forEach(n=>{ // cạnh nối căng theo 2 đầu
+    if(!n._edge)return;const pp=by(n.parent);if(!pp||pp._ox===undefined)return;
+    n._edge.setAttribute('x1',pp.x+pp._ox);n._edge.setAttribute('y1',pp.y+pp._oy);
+    n._edge.setAttribute('x2',n.x+n._ox);n._edge.setAttribute('y2',n.y+n._oy);
+  });
+  if(cam.anim){ // camera bay vào/ra cây con
+    const k=Math.min(1,(t-cam.t0)/cam.dur),e=k<.5?4*k*k*k:1-Math.pow(-2*k+2,3)/2;
+    cam.cx=cam.fx+(cam.tx-cam.fx)*e;cam.cy=cam.fy+(cam.ty-cam.fy)*e;
+    cam.cw=cam.fw+(cam.tw-cam.fw)*e;cam.ch=cam.fh+(cam.th-cam.fh)*e;
+    $('tree').setAttribute('viewBox',cam.cx+' '+cam.cy+' '+cam.cw+' '+cam.ch);
+    if(k>=1)cam.anim=false;
+  }
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+
+// ---- kéo thả: pointermove KHÔNG đụng vào DOM (chỉ ghi vị trí con trỏ),
+//      mọi cập nhật hình ảnh do tick() vẽ mỗi frame → không khựng giữa chừng ----
+function svgPt(e){const s=$('tree'),pt=s.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;return pt.matrixTransform(s.getScreenCTM().inverse())}
+function hotEdges(n,on){
+  [n._edge,...kids(n.id).map(k=>k._edge)].filter(Boolean).forEach(e2=>e2.classList.toggle('hot',on));
+}
+function attachDrag(g,n){
+  g.addEventListener('pointerdown',e=>{
+    if(e.pointerType==='mouse'&&e.button!==0)return;
+    if(e.pointerType!=='mouse'&&mode!=='edit')return; // cảm ứng: chỉ kéo ở chế độ chỉnh sửa (để vẫn cuộn trang được)
+    try{g.setPointerCapture(e.pointerId)}catch(err){}
+    const p=svgPt(e);
+    const [ox,oy]=driftOff(n,performance.now());
+    n._hold=true;n._hx=ox;n._hy=oy;n._ox=ox;n._oy=oy;
+    drag={n,p,dx:p.x-(n.x+ox),dy:p.y-(n.y+oy),sx:p.x,sy:p.y,moved:false};
+    e.preventDefault(); // chặn chọn text/kéo ảnh
+  });
+  g.addEventListener('pointermove',e=>{
+    if(!drag||drag.n!==n)return;
+    const p=svgPt(e);
+    drag.p=p; // chỉ ghi lại, frame kế tick() sẽ vẽ
+    if(!drag.moved&&Math.hypot(p.x-drag.sx,p.y-drag.sy)>=1.2){
+      drag.moved=true;
+      g.classList.add('dragging');
+      hotEdges(n,true);
+    }
+  });
+  const up=()=>{if(!drag||drag.n!==n)return;const d=drag;drag=null;
+    hotEdges(n,false);
+    if(d.moved){
+      g.classList.remove('dragging');
+      suppressClick=true;setTimeout(()=>suppressClick=false,120); // kéo xong không tính là click chọn
+      const [ox,oy]=driftOff(n,performance.now()); // hấp thụ độ lệch trôi vào vị trí gốc → thả không giật
+      n.x=clamp(Math.round(n.x+n._hx-ox),40,720);n.y=clamp(Math.round(n.y+n._hy-oy),40,550);
+      n._hold=false;n._hx=n._hy=0;
+      post('/api/move',{id:n.id,x:n.x,y:n.y}).catch(()=>{});
+    }else{n._hold=false;n._hx=n._hy=0}
+  };
+  g.addEventListener('pointerup',up);g.addEventListener('pointercancel',up);
+}
+
+// ---- các nút điều khiển ----
+$('reset').onclick=()=>{if(confirm('Đặt lại toàn bộ? Cây giữ nguyên, điểm về mặc định.'))
+  post('/api/reset').then(refresh).catch(()=>{})};
+$('max').onclick=()=>post('/api/points',{delta:5}).then(refresh).catch(()=>{});
+$('addroot').onclick=()=>post('/api/node/add',{parent:'',name:'Nền tảng',icon:'◈',cat:Object.keys(D.cats)[0],max_lv:3,x:380,y:120,desc:'Kỹ năng gốc.'})
+  .then(j=>{const ni=j.new_id;return refresh().then(()=>{sel=ni;mode='edit';render();popNode(ni)})}).catch(()=>{});
+$('tree').addEventListener('dblclick',e=>{if(e.target.id==='tree'&&mode==='edit'){mode='use';render()}}); // nhấn đúp nền = thoát sửa
+$('crumb').onclick=()=>{if(view){const p=by(view).parent;setView((p&&by(p).parent)?p:null)}};
+refresh();
+$('exp').onclick=()=>{const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(D,null,2)],{type:'application/json'}));
+  a.download='skilltree-backup.json';a.click();URL.revokeObjectURL(a.href)};
+$('imp').onclick=()=>$('impf').click();
+$('impf').onchange=e=>{const f=e.target.files[0];if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>{let j;try{j=JSON.parse(rd.result)}catch(err){return toast('File không phải JSON hợp lệ')}
+    if(confirm('Nhập sẽ GHI ĐÈ toàn bộ cây hiện tại. Tiếp tục?'))
+      post('/api/import',j).then(()=>{view=null;sel=null;refresh()}).catch(()=>{})};
+  rd.readAsText(f);e.target.value=''};
+
+refresh();
+</script>
+</body>
+</html>

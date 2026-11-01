@@ -1,35 +1,12 @@
 import SwiftUI
-import UIKit
-import UserNotifications
 
-@MainActor
 @main
 struct LifeRpgApp: App {
-    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-
     var body: some Scene {
         WindowGroup {
             PanelRootView()
                 .preferredColorScheme(.dark)
         }
-    }
-}
-
-final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
-    func application(
-        _ application: UIApplication,
-        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
-    ) -> Bool {
-        UNUserNotificationCenter.current().delegate = self
-        return true
-    }
-
-    func userNotificationCenter(
-        _ center: UNUserNotificationCenter,
-        willPresent notification: UNNotification,
-        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
-    ) {
-        completionHandler([.banner, .list, .sound])
     }
 }
 
@@ -39,30 +16,62 @@ struct PanelRootView: View {
     private let background = Color(red: 0.027, green: 0.031, blue: 0.082) // #070815
 
     var body: some View {
-        ZStack {
-            background.ignoresSafeArea()
+        NavigationStack {
+            ZStack {
+                background.ignoresSafeArea()
 
-            PanelWebView(model: model)
-                .ignoresSafeArea(.all)
+                PanelWebView(model: model)
+                    .ignoresSafeArea(.all)
 
-            // Thanh tiến trình mảnh dưới status bar khi đang tải
-            VStack(spacing: 0) {
-                if model.isLoading && !model.isOffline {
-                    ProgressView(value: model.progress)
-                        .tint(Color.accentColor)
-                        .animation(.easeInOut(duration: 0.25), value: model.progress)
+                // Thanh tiến trình mảnh dưới status bar khi đang tải
+                VStack(spacing: 0) {
+                    if model.isLoading && !model.isOffline {
+                        ProgressView(value: model.progress)
+                            .tint(Color.accentColor)
+                            .animation(.easeInOut(duration: 0.25), value: model.progress)
+                    }
+                    Spacer()
                 }
-                Spacer()
+
+                if model.isOffline {
+                    OfflineOverlay {
+                        model.reload()
+                    }
+                    .transition(.opacity)
+                }
             }
-
-            if model.isOffline {
-                OfflineOverlay {
-                    model.reload()
+            .animation(.easeInOut(duration: 0.25), value: model.isOffline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        model.showSourcePicker = true
+                    } label: {
+                        Image(systemName: model.source == .offline ? "internaldrive" : "cloud")
+                            .symbolRenderingMode(.hierarchical)
+                    }
+                    .accessibilityLabel("Chọn nguồn panel")
                 }
-                .transition(.opacity)
+            }
+            .navigationTitle(model.source == .offline ? "Skill Tree · Offline" : "Skill Tree · Web")
+            .navigationBarTitleDisplayMode(.inline)
+            .confirmationDialog(
+                "Chọn nguồn panel",
+                isPresented: $model.showSourcePicker,
+                titleVisibility: .visible
+            ) {
+                ForEach(PanelViewModel.Source.allCases) { src in
+                    Button(src == model.source ? "✓ " + src.rawValue : src.rawValue) {
+                        NotificationCenter.default.post(name: .panelSourceChanged, object: src)
+                    }
+                }
+                Button("Hủy", role: .cancel) {}
+            } message: {
+                Text("""
+                «Trong app» chạy hoàn toàn offline, dữ liệu lưu riêng trên máy này.
+                «Bản web» tải skilltree.risktherain.com — dùng chung dữ liệu với server.
+                """)
             }
         }
-        .animation(.easeInOut(duration: 0.25), value: model.isOffline)
     }
 }
 
