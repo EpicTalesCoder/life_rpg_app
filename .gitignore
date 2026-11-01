@@ -1,0 +1,11 @@
+# Xcode
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+
+# Local build artifacts (SDK tải về để build offline — CI dùng Xcode trên runner)
+_build/
+
+# macOS
+.DS_Store

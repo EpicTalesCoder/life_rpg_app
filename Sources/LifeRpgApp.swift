@@ -9,7 +9,8 @@ struct LifeRpgApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            PanelRootView()
+                .preferredColorScheme(.dark)
         }
     }
 }
@@ -32,61 +33,67 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     }
 }
 
-struct ContentView: View {
-    @State private var clickCount = 0
-    @State private var isShowingError = false
-    @State private var errorMessage = ""
+struct PanelRootView: View {
+    @StateObject private var model = PanelViewModel()
+
+    private let background = Color(red: 0.027, green: 0.031, blue: 0.082) // #070815
 
     var body: some View {
-        VStack(spacing: 24) {
-            Text("Xin chào mq!!!")
-                .font(.largeTitle.bold())
+        ZStack {
+            background.ignoresSafeArea()
 
-            Button("Click!") {
-                clickCount += 1
-                let currentClickCount = clickCount
-                Task {
-                    await sendNotification(for: currentClickCount)
+            PanelWebView(model: model)
+                .ignoresSafeArea(.all)
+
+            // Thanh tiến trình mảnh dưới status bar khi đang tải
+            VStack(spacing: 0) {
+                if model.isLoading && !model.isOffline {
+                    ProgressView(value: model.progress)
+                        .tint(Color.accentColor)
+                        .animation(.easeInOut(duration: 0.25), value: model.progress)
                 }
+                Spacer()
             }
-            .font(.title2)
-            .buttonStyle(.borderedProminent)
+
+            if model.isOffline {
+                OfflineOverlay {
+                    model.reload()
+                }
+                .transition(.opacity)
+            }
         }
-        .padding()
-        .alert("Không thể gửi thông báo", isPresented: $isShowingError) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(errorMessage)
-        }
+        .animation(.easeInOut(duration: 0.25), value: model.isOffline)
     }
+}
 
-    @MainActor
-    private func sendNotification(for count: Int) async {
-        let notificationCenter = UNUserNotificationCenter.current()
+struct OfflineOverlay: View {
+    var retry: () -> Void
 
-        do {
-            let isAuthorized = try await notificationCenter.requestAuthorization(options: [.alert, .sound, .badge])
-            guard isAuthorized else {
-                errorMessage = "Vui lòng bật quyền thông báo cho ứng dụng trong Cài đặt để nhận thông báo trên màn hình khóa."
-                isShowingError = true
-                return
+    var body: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "wifi.exclamationmark")
+                .font(.system(size: 56, weight: .light))
+                .foregroundStyle(.white.opacity(0.85))
+
+            Text("Mất kết nối")
+                .font(.title2.bold())
+                .foregroundStyle(.white)
+
+            Text("Không tải được panel Skill Tree.\nKiểm tra mạng rồi thử lại nhé.")
+                .font(.subheadline)
+                .foregroundStyle(.white.opacity(0.65))
+                .multilineTextAlignment(.center)
+
+            Button(action: retry) {
+                Label("Thử lại", systemImage: "arrow.clockwise")
+                    .font(.headline)
             }
-
-            let content = UNMutableNotificationContent()
-            content.title = "Xin chào mq!!!"
-            content.body = "Bạn đã click \(count) lần"
-            content.sound = .default
-
-            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
-            let request = UNNotificationRequest(
-                identifier: UUID().uuidString,
-                content: content,
-                trigger: trigger
-            )
-            try await notificationCenter.add(request)
-        } catch {
-            errorMessage = error.localizedDescription
-            isShowingError = true
+            .buttonStyle(.borderedProminent)
+            .tint(Color.accentColor)
+            .padding(.top, 6)
         }
+        .padding(36)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(red: 0.027, green: 0.031, blue: 0.082).ignoresSafeArea())
     }
 }

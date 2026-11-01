@@ -6,10 +6,12 @@
 
 /* Begin PBXBuildFile section */
 		A10000000000000000000001 /* LifeRpgApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000002 /* LifeRpgApp.swift */; };
+		A10000000000000000000010 /* PanelWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000011 /* PanelWebView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		A10000000000000000000002 /* LifeRpgApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LifeRpgApp.swift; sourceTree = "<group>"; };
+		A10000000000000000000011 /* PanelWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelWebView.swift; sourceTree = "<group>"; };
 		A10000000000000000000003 /* LifeRpgApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LifeRpgApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -26,6 +28,7 @@
 			isa = PBXGroup;
 			children = (
 				A10000000000000000000002 /* LifeRpgApp.swift */,
+				A10000000000000000000011 /* PanelWebView.swift */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -94,6 +97,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A10000000000000000000001 /* LifeRpgApp.swift in Sources */,
+				A10000000000000000000010 /* PanelWebView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -121,30 +125,38 @@
 		A1000000000000000000000E /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Xin Chao MQ";
+				INFOPLIST_KEY_CFBundleDisplayName = "Skill Tree";
+				INFOPLIST_KEY_CFBundleShortVersionString = 1.0;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIUserInterfaceStyle = Dark;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mq.life_rpg_app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = iphoneos;
 				SUPPORTS_MACCATALYST = NO;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
 		A1000000000000000000000F /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Xin Chao MQ";
+				INFOPLIST_KEY_CFBundleDisplayName = "Skill Tree";
+				INFOPLIST_KEY_CFBundleShortVersionString = 1.0;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIUserInterfaceStyle = Dark;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mq.life_rpg_app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = iphoneos;
 				SUPPORTS_MACCATALYST = NO;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};
