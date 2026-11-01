@@ -1,54 +1,37 @@
 import SwiftUI
 import WebKit
 
-// Panel skill tree chạy OFFLINE trong app:
-// - UI: Resources/index.html (từ repo EpicTalesCoder/skilltree) bundle sẵn trong IPA.
-// - API: SkillTreeLocalServer (Swift) thay thế server.py — cùng endpoints, dữ liệu lưu SQLite trong app.
-// - Remote URL chỉ dùng khi bật "Dùng bản web" trong menu app (sync với skilltree.risktherain.com).
+// Toàn bộ panel chạy dạng WEB (điện thoại luôn có 4G, không còn bản offline):
+//   - Skill Tree : skilltree.risktherain.com
+//   - Agent      : agent.risktherain.com (Hermes dashboard)
+//   - Dell Agent : dell-agent.risktherain.com (Hermes dashboard)
+// Mỗi tab là một WKWebView riêng, giữ nguyên phiên đăng nhập khi chuyển qua lại.
 
-let PANEL_URL = URL(string: "https://skilltree.risktherain.com")!
-let AGENT_PANEL_URL = URL(string: "https://agent.risktherain.com")!
-let DELL_AGENT_PANEL_URL = URL(string: "https://dell-agent.risktherain.com")!
+struct PanelSite: Identifiable {
+    let title: String
+    let systemImage: String
+    let url: URL
+    var id: String { title }
+}
+
+let PANEL_SITES: [PanelSite] = [
+    PanelSite(title: "Skill Tree", systemImage: "tree", url: URL(string: "https://skilltree.risktherain.com")!),
+    PanelSite(title: "Agent", systemImage: "cpu", url: URL(string: "https://agent.risktherain.com")!),
+    PanelSite(title: "Dell Agent", systemImage: "desktopcomputer", url: URL(string: "https://dell-agent.risktherain.com")!),
+]
 
 // MARK: - ViewModel
 
 @MainActor
 final class PanelViewModel: ObservableObject {
-    enum Source: String, CaseIterable, Identifiable {
-        case offline = "Trong app"
-        case remote = "Bản web"
-        case agent = "Agent Panel"
-        case dellAgent = "Dell Agent"
-        var id: String { rawValue }
-
-        var navigationTitle: String {
-            switch self {
-            case .offline: return "Skill Tree · Offline"
-            case .remote: return "Skill Tree · Web"
-            case .agent: return "Agent · risktherain"
-            case .dellAgent: return "Dell Agent"
-            }
-        }
-    }
-
     @Published var isLoading = true
     @Published var progress: Double = 0
     @Published var isOffline = false
     @Published var toast: String?
-    @Published var source: Source = .offline
-    @Published var showSourcePicker = false
-
-    private(set) var lastError: String?
 
     func reload() {
         isOffline = false
-        lastError = nil
         NotificationCenter.default.post(name: .panelReloadRequested, object: nil)
-    }
-
-    func handleFailure(_ message: String) {
-        lastError = message
-        isOffline = true
     }
 
     func showToast(_ message: String) {
@@ -68,6 +51,7 @@ extension Notification.Name {
 
 struct PanelWebView: UIViewRepresentable {
     @ObservedObject var model: PanelViewModel
+    let site: PanelSite
 
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
@@ -87,13 +71,17 @@ struct PanelWebView: UIViewRepresentable {
         webView.isOpaque = false
         webView.allowsBackForwardNavigationGestures = true
         webView.isAccessibilityElement = true
-        webView.accessibilityLabel = "Panel Skill Tree"
+        webView.accessibilityLabel = "Panel \(site.title)"
 
+        // Kéo xuống để tải lại — thao tác quen thuộc trên điện thoại
+        let refresh = UIRefreshControl()
+        refresh.tintColor = .white
+        refresh.addTarget(context.coordinator, action: #selector(Coordinator.pullToRefresh), for: .valueChanged)
+        webView.scrollView.addSubview(refresh)
+        context.coordinator.refreshControl = refresh
         context.coordinator.webView = webView
-        context.coordinator.observeReload()
-        context.coordinator.observeSourceChange()
 
-        webView.load(context.coordinator.request(for: model.source))
+        webView.load(URLRequest(url: site.url))
         return webView
     }
 
@@ -103,68 +91,25 @@ struct PanelWebView: UIViewRepresentable {
 
     final class Coordinator: NSObject, WKNavigationDelegate {
         let model: PanelViewModel
-        var webView: WKWebView?
+        weak var webView: WKWebView?
+        weak var refreshControl: UIRefreshControl?
         private var reloadObserver: NSObjectProtocol?
-        private var sourceObserver: NSObjectProtocol?
-        private var localServer: SkillTreeLocalServer?
 
         init(model: PanelViewModel) {
             self.model = model
-        }
-
-        func request(for source: PanelViewModel.Source) -> URLRequest {
-            switch source {
-            case .offline:
-                let server = localServer ?? {
-                    let s = SkillTreeLocalServer()
-                    do { try s.start() } catch {
-                        model.showToast("Không khởi động được server cục bộ: \(error.localizedDescription)")
-                    }
-                    localServer = s
-                    return s
-                }()
-                return URLRequest(url: server.rootURL)
-            case .remote:
-                // Dừng server cục bộ khi chuyển sang bản web
-                localServer?.stop()
-                localServer = nil
-                return URLRequest(url: PANEL_URL)
-            case .agent:
-                localServer?.stop()
-                localServer = nil
-                return URLRequest(url: AGENT_PANEL_URL)
-            case .dellAgent:
-                localServer?.stop()
-                localServer = nil
-                return URLRequest(url: DELL_AGENT_PANEL_URL)
-            }
-        }
-
-        func observeReload() {
             reloadObserver = NotificationCenter.default.addObserver(
                 forName: .panelReloadRequested, object: nil, queue: .main
             ) { [weak self] _ in
-                guard let self, let webView = self.webView else { return }
-                webView.reload()
-            }
-        }
-
-        func observeSourceChange() {
-            sourceObserver = NotificationCenter.default.addObserver(
-                forName: .panelSourceChanged, object: nil, queue: .main
-            ) { [weak self] note in
-                guard let self,
-                      let source = note.object as? PanelViewModel.Source,
-                      source != self.model.source else { return }
-                self.model.source = source
-                self.webView?.load(self.request(for: source))
+                self?.webView?.reload()
             }
         }
 
         deinit {
             if let reloadObserver { NotificationCenter.default.removeObserver(reloadObserver) }
-            if let sourceObserver { NotificationCenter.default.removeObserver(sourceObserver) }
-            localServer?.stop()
+        }
+
+        @objc func pullToRefresh() {
+            webView?.reload()
         }
 
         // MARK: WKNavigationDelegate
@@ -182,12 +127,12 @@ struct PanelWebView: UIViewRepresentable {
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             model.isLoading = false
             model.progress = 1
+            refreshControl?.endRefreshing()
         }
 
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-            model.isLoading = false
-            model.handleFailure(error.localizedDescription)
-            model.showToast("Lỗi tải trang: \(error.localizedDescription)")
+            refreshControl?.endRefreshing()
+            handleLoadFailure()
         }
 
         func webView(
@@ -195,19 +140,20 @@ struct PanelWebView: UIViewRepresentable {
             didFailProvisionalNavigation navigation: WKNavigation!,
             withError error: Error
         ) {
+            refreshControl?.endRefreshing()
+            handleLoadFailure()
+        }
+
+        private func handleLoadFailure() {
             model.isLoading = false
-            // Bản web skill tree lỗi mạng → đưa về bản trong app;
-            // các panel agent giữ nguyên nguồn, chỉ hiện overlay thử lại.
-            if model.source == .remote {
-                model.showToast("Không kết nối được bản web, chuyển về bản trong app")
-                NotificationCenter.default.post(name: .panelSourceChanged, object: PanelViewModel.Source.offline)
+            // Link con lỗi → lùi lại trang trước thay vì chết cả tab;
+            // trang chủ lỗi hẳn → hiện overlay thử lại.
+            if let webView, webView.canGoBack {
+                webView.goBack()
+                model.showToast("Không tải được trang, đã quay lại")
             } else {
-                model.handleFailure(error.localizedDescription)
+                model.isOffline = true
             }
         }
     }
-}
-
-extension Notification.Name {
-    static let panelSourceChanged = Notification.Name("panelSourceChanged")
 }

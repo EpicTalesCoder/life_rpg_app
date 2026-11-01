@@ -4,75 +4,63 @@ import SwiftUI
 struct LifeRpgApp: App {
     var body: some Scene {
         WindowGroup {
-            PanelRootView()
-                .preferredColorScheme(.dark)
+            TabView {
+                PanelScreen(site: PANEL_SITES[0])
+                    .tabItem { Label(PANEL_SITES[0].title, systemImage: PANEL_SITES[0].systemImage) }
+                PanelScreen(site: PANEL_SITES[1])
+                    .tabItem { Label(PANEL_SITES[1].title, systemImage: PANEL_SITES[1].systemImage) }
+                PanelScreen(site: PANEL_SITES[2])
+                    .tabItem { Label(PANEL_SITES[2].title, systemImage: PANEL_SITES[2].systemImage) }
+            }
+            .preferredColorScheme(.dark)
         }
     }
 }
 
-struct PanelRootView: View {
+struct PanelScreen: View {
+    let site: PanelSite
     @StateObject private var model = PanelViewModel()
-
     private let background = Color(red: 0.027, green: 0.031, blue: 0.082) // #070815
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                background.ignoresSafeArea()
+        ZStack {
+            background.ignoresSafeArea()
 
-                PanelWebView(model: model)
-                    .ignoresSafeArea(.all)
+            PanelWebView(model: model, site: site)
 
-                // Thanh tiến trình mảnh dưới status bar khi đang tải
-                VStack(spacing: 0) {
-                    if model.isLoading && !model.isOffline {
-                        ProgressView(value: model.progress)
-                            .tint(Color.accentColor)
-                            .animation(.easeInOut(duration: 0.25), value: model.progress)
-                    }
+            // Thanh tiến trình mảnh ở mép trên khi đang tải
+            VStack(spacing: 0) {
+                if model.isLoading && !model.isOffline {
+                    ProgressView(value: model.progress)
+                        .tint(Color.accentColor)
+                        .animation(.easeInOut(duration: 0.25), value: model.progress)
+                }
+                Spacer()
+            }
+
+            if model.isOffline {
+                OfflineOverlay {
+                    model.reload()
+                }
+                .transition(.opacity)
+            }
+
+            if let toast = model.toast {
+                VStack {
                     Spacer()
+                    Text(toast)
+                        .font(.footnote.weight(.medium))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(.ultraThinMaterial, in: Capsule())
+                        .padding(.bottom, 56) // nổi phía trên tab bar
+                        .transition(.opacity)
                 }
-
-                if model.isOffline {
-                    OfflineOverlay {
-                        model.reload()
-                    }
-                    .transition(.opacity)
-                }
-            }
-            .animation(.easeInOut(duration: 0.25), value: model.isOffline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        model.showSourcePicker = true
-                    } label: {
-                        Image(systemName: model.source == .offline ? "internaldrive" : "cloud")
-                            .symbolRenderingMode(.hierarchical)
-                    }
-                    .accessibilityLabel("Chọn nguồn panel")
-                }
-            }
-            .navigationTitle(model.source.navigationTitle)
-            .navigationBarTitleDisplayMode(.inline)
-            .confirmationDialog(
-                "Chọn nguồn panel",
-                isPresented: $model.showSourcePicker,
-                titleVisibility: .visible
-            ) {
-                ForEach(PanelViewModel.Source.allCases) { src in
-                    Button(src == model.source ? "✓ " + src.rawValue : src.rawValue) {
-                        NotificationCenter.default.post(name: .panelSourceChanged, object: src)
-                    }
-                }
-                Button("Hủy", role: .cancel) {}
-            } message: {
-                Text("""
-                «Trong app» chạy hoàn toàn offline, dữ liệu lưu riêng trên máy này.
-                «Bản web» tải skilltree.risktherain.com — dùng chung dữ liệu với server.
-                «Agent Panel» và «Dell Agent» mở dashboard Hermes tại agent.risktherain.com và dell-agent.risktherain.com (cần đăng nhập lần đầu).
-                """)
+                .animation(.easeInOut(duration: 0.2), value: model.toast)
             }
         }
+        .animation(.easeInOut(duration: 0.25), value: model.isOffline)
     }
 }
 
