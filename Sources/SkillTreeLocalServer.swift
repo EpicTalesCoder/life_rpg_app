@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 // HTTP server cục bộ (Swift, không dependency) thay thế server.py của repo skilltree:
 // - Phục vụ index.html từ bundle app.
@@ -42,6 +43,8 @@ final class SkillTreeLocalServer {
 // MARK: - SQLite database (giống schema + seed của server.py)
 
 import SQLite3
+
+private let sqliteTransient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
 final class SkillTreeDatabase {
     private var db: OpaquePointer?
@@ -147,7 +150,7 @@ final class SkillTreeDatabase {
             let idx = Int32(i + 1)
             switch p {
             case let s as String:
-                sqlite3_bind_text(stmt, idx, s, -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(stmt, idx, s, -1, sqliteTransient)
             case let n as Int:
                 sqlite3_bind_int64(stmt, idx, sqlite3_int64(n))
             case let d as Double:
@@ -159,7 +162,7 @@ final class SkillTreeDatabase {
             case let b as Bool:
                 sqlite3_bind_int64(stmt, idx, b ? 1 : 0)
             default:
-                sqlite3_bind_text(stmt, idx, "\(p)", -1, SQLITE_TRANSIENT)
+                sqlite3_bind_text(stmt, idx, "\(p)", -1, sqliteTransient)
             }
         }
     }
@@ -239,7 +242,15 @@ final class SkillTreeDatabase {
 
     // MARK: API (trả [String: Any] hoặc throw ApiError như server.py)
 
-    struct ApiError: Error { let code: Int; let message: String }
+    struct ApiError: Error {
+        let code: Int
+        let message: String
+
+        init(_ code: Int, _ message: String) {
+            self.code = code
+            self.message = message
+        }
+    }
 
     func apiUp(_ b: [String: Any]) throws -> [String: Any] {
         let nid = b["id"] as? String ?? ""
@@ -422,7 +433,7 @@ final class SkillTreeDatabase {
         var nodes: [[String: Any]] = []
         var byid: [String: [String: Any]] = [:]
         for n in nodesIn {
-            var f = try cleanNode(n, cats: cats, byid: byid, selfId: nil)
+            var f = try cleanNode(n, cats: Set(cats.keys), byid: byid, selfId: nil)
             f["id"] = (n["id"] as? String ?? "").trimmingCharacters(in: .whitespaces)
             f["parent"] = n["parent"] as? String ?? ""
             if let p = f["parent"] as? String, !p.isEmpty, !ids.contains(p) { f["parent"] = "" }
@@ -534,8 +545,10 @@ final class POSIXHTTPListener {
 
     init(port: Int) throws {
         self.port = port
-        let fd = socket(AF_INET, Int32(SOCK_STREAM.rawValue), 0)
-        guard fd >= 0 else { throw POSIXError(errno) }
+        let fd = socket(AF_INET, SOCK_STREAM, 0)
+        guard fd >= 0 else {
+            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+        }
         var yes: Int32 = 1
         setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, socklen_t(MemoryLayout<Int32>.size))
 
@@ -552,7 +565,7 @@ final class POSIXHTTPListener {
         guard bindResult == 0, listen(fd, 8) == 0 else {
             let code = errno
             close(fd)
-            throw POSIXError(code)
+            throw POSIXError(POSIXErrorCode(rawValue: code) ?? .EIO)
         }
         serverFD = fd
         if port == 0 {
@@ -750,7 +763,7 @@ extension Int32 {
             guard var pointer = raw.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
             var remaining = data.count
             while remaining > 0 {
-                let n = self.write(pointer, remaining)
+                let n = Darwin.write(self, pointer, remaining)
                 guard n > 0 else { break }
                 pointer += n
                 remaining -= n

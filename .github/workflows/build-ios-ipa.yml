@@ -156,11 +156,11 @@ jobs:
           staging_dir="$RUNNER_TEMP/ipa"
           mkdir -p "$staging_dir/Payload"
           ditto "$app_path" "$staging_dir/Payload/$app_name.app"
-          ipa_path="$GITHUB_WORKSPACE/$app_name.ipa"
+          ipa_path="$GITHUB_WORKSPACE/mq.ipa"
           (cd "$staging_dir" && /usr/bin/zip -qry "$ipa_path" Payload)
 
           echo "ipa_path=$ipa_path" >> "$GITHUB_OUTPUT"
-          echo "ipa_name=$app_name.ipa" >> "$GITHUB_OUTPUT"
+          echo "ipa_name=mq.ipa" >> "$GITHUB_OUTPUT"
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
