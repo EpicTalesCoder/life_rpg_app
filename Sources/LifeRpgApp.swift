@@ -52,7 +52,7 @@ struct PanelRootView: View {
                     .accessibilityLabel("Chọn nguồn panel")
                 }
             }
-            .navigationTitle(model.source == .offline ? "Skill Tree · Offline" : "Skill Tree · Web")
+            .navigationTitle(model.source.navigationTitle)
             .navigationBarTitleDisplayMode(.inline)
             .confirmationDialog(
                 "Chọn nguồn panel",
@@ -69,6 +69,7 @@ struct PanelRootView: View {
                 Text("""
                 «Trong app» chạy hoàn toàn offline, dữ liệu lưu riêng trên máy này.
                 «Bản web» tải skilltree.risktherain.com — dùng chung dữ liệu với server.
+                «Agent Panel» và «Dell Agent» mở dashboard Hermes tại agent.risktherain.com và dell-agent.risktherain.com (cần đăng nhập lần đầu).
                 """)
             }
         }
@@ -88,7 +89,7 @@ struct OfflineOverlay: View {
                 .font(.title2.bold())
                 .foregroundStyle(.white)
 
-            Text("Không tải được panel Skill Tree.\nKiểm tra mạng rồi thử lại nhé.")
+            Text("Không tải được panel.\nKiểm tra mạng rồi thử lại nhé.")
                 .font(.subheadline)
                 .foregroundStyle(.white.opacity(0.65))
                 .multilineTextAlignment(.center)

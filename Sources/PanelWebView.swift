@@ -7,6 +7,8 @@ import WebKit
 // - Remote URL chỉ dùng khi bật "Dùng bản web" trong menu app (sync với skilltree.risktherain.com).
 
 let PANEL_URL = URL(string: "https://skilltree.risktherain.com")!
+let AGENT_PANEL_URL = URL(string: "https://agent.risktherain.com")!
+let DELL_AGENT_PANEL_URL = URL(string: "https://dell-agent.risktherain.com")!
 
 // MARK: - ViewModel
 
@@ -15,7 +17,18 @@ final class PanelViewModel: ObservableObject {
     enum Source: String, CaseIterable, Identifiable {
         case offline = "Trong app"
         case remote = "Bản web"
+        case agent = "Agent Panel"
+        case dellAgent = "Dell Agent"
         var id: String { rawValue }
+
+        var navigationTitle: String {
+            switch self {
+            case .offline: return "Skill Tree · Offline"
+            case .remote: return "Skill Tree · Web"
+            case .agent: return "Agent · risktherain"
+            case .dellAgent: return "Dell Agent"
+            }
+        }
     }
 
     @Published var isLoading = true
@@ -116,6 +129,14 @@ struct PanelWebView: UIViewRepresentable {
                 localServer?.stop()
                 localServer = nil
                 return URLRequest(url: PANEL_URL)
+            case .agent:
+                localServer?.stop()
+                localServer = nil
+                return URLRequest(url: AGENT_PANEL_URL)
+            case .dellAgent:
+                localServer?.stop()
+                localServer = nil
+                return URLRequest(url: DELL_AGENT_PANEL_URL)
             }
         }
 
@@ -175,7 +196,8 @@ struct PanelWebView: UIViewRepresentable {
             withError error: Error
         ) {
             model.isLoading = false
-            // Bản web lỗi mạng → đưa về bản trong app
+            // Bản web skill tree lỗi mạng → đưa về bản trong app;
+            // các panel agent giữ nguyên nguồn, chỉ hiện overlay thử lại.
             if model.source == .remote {
                 model.showToast("Không kết nối được bản web, chuyển về bản trong app")
                 NotificationCenter.default.post(name: .panelSourceChanged, object: PanelViewModel.Source.offline)
