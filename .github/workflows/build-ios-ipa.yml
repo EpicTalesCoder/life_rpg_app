@@ -17,7 +17,7 @@ on:
         type: string
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -169,3 +169,17 @@ jobs:
           path: ${{ steps.ipa.outputs.ipa_path }}
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publish GitHub release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IPA_PATH: ${{ steps.ipa.outputs.ipa_path }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tag="build-${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}"
+          gh release create "$tag" "$IPA_PATH" \
+            --title "iOS build ${GITHUB_RUN_NUMBER}" \
+            --notes "Unsigned IPA built from commit ${GITHUB_SHA} for installation with TrollStore."
