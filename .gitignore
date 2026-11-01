@@ -9,3 +9,4 @@ _build/
 
 # macOS
 .DS_Store
+AppIcon.iconset/

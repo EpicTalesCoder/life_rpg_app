@@ -89,7 +89,9 @@ final class SkillTreeDatabase {
             CREATE TABLE IF NOT EXISTS state(node_id TEXT PRIMARY KEY, lv INTEGER NOT NULL DEFAULT 0);
             CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
             """)
-            guard meta("seeded") != "1" else { return }
+            // Đọc meta trực tiếp trong block (meta() có queue.sync riêng → gọi tại đây sẽ deadlock)
+            let seeded = query("SELECT value FROM meta WHERE key='seeded'").first?["value"] as? String
+            guard seeded != "1" else { return }
             for (name, color) in Self.defaultCats {
                 exec("INSERT OR IGNORE INTO cats(name,color) VALUES(?,?)", [name, color])
             }
@@ -171,7 +173,7 @@ final class SkillTreeDatabase {
     }
 
     private func setMeta(_ k: String, _ v: Any) {
-        exec("INSERT OR REPLACE INTO meta(key,value) VALUES(?,?)", [k, String(describing: v)])
+        exec("INSERT OR REPLACE INTO meta(key,value) VALUES(?,?)", [k, "\(v)"])
     }
 
     private func points() -> Int {
@@ -179,7 +181,7 @@ final class SkillTreeDatabase {
     }
 
     private func level(_ nid: String) -> Int {
-        Int(queue.sync { query("SELECT lv FROM state WHERE node_id=?", [nid]).first?["lv"] as? Int ?? 0 })
+        query("SELECT lv FROM state WHERE node_id=?", [nid]).first?["lv"] as? Int ?? 0
     }
 
     private func setLevel(_ nid: String, _ lv: Int) {
@@ -272,7 +274,7 @@ final class SkillTreeDatabase {
             guard !hasOpenKid else { throw ApiError(400, "Đang có node con mở — hoàn node con trước") }
         }
         if lv == 1 {
-            exec("DELETE FROM state WHERE node_id=?", [nid])
+            exec("DELETE FROM state WHERE node_id=?", [nid])  // không để row lv=0 (giống server.py)
         } else {
             setLevel(nid, lv - 1)
         }
