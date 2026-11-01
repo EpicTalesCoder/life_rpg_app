@@ -42,7 +42,7 @@ struct PanelRootView: View {
             }
             .animation(.easeInOut(duration: 0.25), value: model.isOffline)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
                         model.showSourcePicker = true
                     } label: {

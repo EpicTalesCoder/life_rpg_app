@@ -232,10 +232,13 @@ final class SkillTreeDatabase {
             for r in query("SELECT * FROM state") {
                 state[r["node_id"] as? String ?? ""] = r["lv"] as? Int ?? 0
             }
+            let points = Int(query("SELECT value FROM meta WHERE key='pts'").first?["value"] as? String ?? "0") ?? 0
+            let basePoints = Int(query("SELECT value FROM meta WHERE key='base_points'").first?["value"] as? String
+                ?? "\(Self.basePoints)") ?? Self.basePoints
             return [
                 "cats": cats, "nodes": nodes, "state": state,
-                "pts": points(),
-                "base_points": Int(meta("base_points") ?? "\(Self.basePoints)") ?? Self.basePoints,
+                "pts": points,
+                "base_points": basePoints,
             ]
         }
     }
