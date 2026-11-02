@@ -134,6 +134,7 @@ struct PanelWebView: UIViewRepresentable {
 
         init(model: PanelViewModel) {
             self.model = model
+            super.init()
             reloadObserver = NotificationCenter.default.addObserver(
                 forName: .panelReloadRequested, object: nil, queue: .main
             ) { [weak self] _ in
