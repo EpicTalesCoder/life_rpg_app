@@ -47,11 +47,34 @@ extension Notification.Name {
     static let panelReloadRequested = Notification.Name("panelReloadRequested")
 }
 
+// Tiện ích nhỏ: encode chuỗi an toàn để nhúng vào JS (dùng cho CSS injection)
+extension String {
+    var jsonEncoded: String {
+        guard let data = try? JSONEncoder().encode(self) else { return "\"\"" }
+        return String(data: data, encoding: .utf8) ?? "\"\""
+    }
+}
+
 // MARK: - WebView
 
 struct PanelWebView: UIViewRepresentable {
     @ObservedObject var model: PanelViewModel
     let site: PanelSite
+
+    // Dashboard agent/dell-agent hiển thị nav mục nhỏ (38pt, font 13px) và nút
+    // hamburger 41pt — quá nhỏ để bấm trên điện thoại. CSS dưới đây phóng to
+    // mục nav lên ≥56pt + font 17px, hamburger 48pt (đúng chuẩn touch Apple).
+    // Chỉ tác động vào sidebar/header của dashboard Hermes; trang khác giữ nguyên.
+    private static let navFixCSS = """
+    aside nav a[href] {
+      min-height: 56px !important;
+      padding-top: 16px !important;
+      padding-bottom: 16px !important;
+      font-size: 17px !important;
+    }
+    aside nav a[href] svg { width: 22px !important; height: 22px !important; }
+    header button[aria-label*="navigation"] { width: 48px !important; height: 48px !important; }
+    """
 
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
@@ -62,6 +85,20 @@ struct PanelWebView: UIViewRepresentable {
         prefs.javaScriptEnabled = true
         prefs.javaScriptCanOpenWindowsAutomatically = false
         config.preferences = prefs
+
+        // Phóng to nav dashboard agent (chạy trước khi trang render)
+        let navFix = WKUserScript(
+            source: """
+            (function(){
+              var s = document.createElement('style');
+              s.id = 'mq-nav-fix';
+              s.textContent = \(Self.navFixCSS.jsonEncoded);
+              document.head.appendChild(s);
+            })();
+            """,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true)
+        config.userContentController.addUserScript(navFix)
 
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
